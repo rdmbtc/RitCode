@@ -6,7 +6,7 @@ import { Loader2, Check, X, Copy, Save, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ritualChain } from "@/lib/wagmi"
 
-const CODE_MINT_ADDRESS = "0x0000000000000000000000000000000000000000" // TODO: update after deploy
+const CODE_MINT_ADDRESS = "0x64585dd3090199bdbcbbb67e06f1497e945"
 
 const CODE_MINT_ABI = [
   {

@@ -2,7 +2,7 @@
 // Usage: npx tsx scripts/deploy-mint.ts
 // Requires: PRIVATE_KEY env var
 
-import { createWalletClient, http, defineChain } from "viem"
+import { createWalletClient, createPublicClient, http, defineChain } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 
 const ritualChain = defineChain({
@@ -25,21 +25,26 @@ async function deploy() {
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`)
-  const client = createWalletClient({
+  const walletClient = createWalletClient({
     chain: ritualChain,
     transport: http(),
     account,
   })
 
+  const publicClient = createPublicClient({
+    chain: ritualChain,
+    transport: http(),
+  })
+
   console.log("Deploying CodeMint from:", account.address)
   console.log("Chain: Ritual Testnet (1979)")
 
-  const hash = await client.deployContract({
+  const hash = await walletClient.deployContract({
     abi: [],
     bytecode: BYTECODE as `0x${string}`,
   })
 
-  const receipt = await client.waitForTransactionReceipt({ hash })
+  const receipt = await publicClient.waitForTransactionReceipt({ hash })
   console.log("Deployed at:", receipt.contractAddress)
   console.log("Gas used:", receipt.gasUsed.toString())
 }
