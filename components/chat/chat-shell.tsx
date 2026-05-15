@@ -245,7 +245,8 @@ export function ChatShell() {
               }
             }
           } else {
-            // AI SDK text stream: raw JSON lines
+            // AI SDK text stream: raw JSON lines or plain text
+            // Try to split by newlines, but also handle non-JSON content
             const lines = buffer.split("\n")
             buffer = lines.pop() || ""
 
@@ -253,7 +254,6 @@ export function ChatShell() {
               if (!line.trim()) continue
               try {
                 const data = JSON.parse(line)
-                console.log("[chat] parsed line:", data.type, data)
 
                 if (data.type === "text-delta" && typeof data.textDelta === "string") {
                   accumulatedContent += data.textDelta
@@ -271,9 +271,44 @@ export function ChatShell() {
                   )
                 }
               } catch {
-                // Not valid JSON
+                // Not JSON — treat as raw text
+                accumulatedContent += line
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                  ),
+                )
               }
             }
+          }
+        }
+
+        // Process remaining buffer (might be a single chunk with no trailing newline)
+        if (buffer.trim() && !isSSE) {
+          try {
+            const data = JSON.parse(buffer)
+            if (data.type === "text-delta" && typeof data.textDelta === "string") {
+              accumulatedContent += data.textDelta
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                ),
+              )
+            } else if (data.type === "text" && typeof data.text === "string") {
+              accumulatedContent = data.text
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                ),
+              )
+            }
+          } catch {
+            accumulatedContent += buffer
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+              ),
+            )
           }
         }
 
