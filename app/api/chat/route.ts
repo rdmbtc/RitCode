@@ -30,32 +30,32 @@ function buildModel(modelId: string): LanguageModel {
 
   // Google / Gemini
   if (provider === "google" || provider === "gemini") {
-    const google = createGoogleGenerativeAI({
-      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-    })
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!apiKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+    const google = createGoogleGenerativeAI({ apiKey })
     return google(name)
   }
 
   // OpenAI
   if (provider === "openai") {
-    const openai = createOpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    })
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+    const openai = createOpenAI({ apiKey })
     return openai(name)
   }
 
-  // Anthropic, Groq, xAI, and others via OpenAI-compatible SDK
+  // Anthropic, Groq, xAI — try their own key first, fall back to OpenAI key
   if (provider === "anthropic" || provider === "groq" || provider === "xai") {
-    const openai = createOpenAI({
-      apiKey: process.env[`${provider.toUpperCase()}_API_KEY`] || process.env.OPENAI_API_KEY || "sk-placeholder",
-    })
+    const key = process.env[`${provider.toUpperCase()}_API_KEY`] || process.env.OPENAI_API_KEY
+    if (!key) throw new Error(`${provider.toUpperCase()}_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.`)
+    const openai = createOpenAI({ apiKey: key })
     return openai(name)
   }
 
   // Fallback: OpenAI SDK
-  const openai = createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "sk-placeholder",
-  })
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+  const openai = createOpenAI({ apiKey })
   return openai(name)
 }
 
@@ -183,11 +183,10 @@ export async function POST(req: Request) {
     return result.toTextStreamResponse()
   } catch (error) {
     console.error("Chat API error:", error)
+    const message = error instanceof Error ? error.message : "An unexpected error occurred"
 
     return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "An unexpected error occurred",
-      }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     )
   }
