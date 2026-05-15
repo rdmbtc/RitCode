@@ -155,23 +155,9 @@ export function ChatShell() {
       setAbortController(controller)
 
       try {
-        // Determine API endpoint based on settings
-        const apiEndpoint = appSettings.useCustomApi && appSettings.customApiEndpoint
-          ? appSettings.customApiEndpoint
-          : "/api/chat"
-        
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        }
-        
-        // Add custom API key if using custom endpoint
-        if (appSettings.useCustomApi && appSettings.customApiKey) {
-          headers["Authorization"] = `Bearer ${appSettings.customApiKey}`
-        }
-
-        const response = await fetch(apiEndpoint, {
+        const response = await fetch("/api/chat", {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: [...messages, userMessage].map((m) => ({
               role: m.role,
@@ -179,6 +165,8 @@ export function ChatShell() {
               imageData: m.imageData,
             })),
             model: selectedModel,
+            customApiEndpoint: appSettings.useCustomApi ? appSettings.customApiEndpoint : undefined,
+            customApiKey: appSettings.useCustomApi ? appSettings.customApiKey : undefined,
           }),
           signal: controller.signal,
         })

@@ -1,80 +1,8 @@
 import { streamText } from "ai"
+import { createOpenAI, OpenAIProviderSettings } from "@ai-sdk/openai"
+import { createGoogleGenerativeAI, GoogleGenerativeAIProviderSettings } from "@ai-sdk/google"
 
-/**
- * POST /api/chat
- *
- * This route handler proxies requests to the Vercel AI Gateway.
- * It receives messages from the frontend and streams the AI response back.
- */
-export async function POST(req: Request) {
-  try {
-    const { messages, model } = await req.json()
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: "Invalid request: messages array required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      })
-    }
-
-    const selectedModel = model || "google/gemini-2.0-flash-001"
-
-    const lastIndex = messages.length - 1
-    const transformedMessages = messages.map(
-      (m: { role: string; content: string; imageData?: string }, index: number) => {
-        // Only process image for the last user message
-        const isLastUserMessage = index === lastIndex && m.role === "user"
-
-        if (isLastUserMessage && m.imageData && m.imageData.startsWith("data:image/")) {
-          // For the current message with an image, use multimodal content format
-          return {
-            role: m.role as "user" | "assistant",
-            content: [
-              {
-                type: "image" as const,
-                image: m.imageData,
-              },
-              {
-                type: "text" as const,
-                text: m.content || "Describe this image in detail.",
-              },
-            ],
-          }
-        }
-
-        // For all other messages (history), use text only
-        // If there was an image, mention it in the text
-        let textContent = m.content
-        if (m.imageData && !isLastUserMessage) {
-          textContent = m.content || "[User shared an image]"
-        }
-
-        return {
-          role: m.role as "user" | "assistant",
-          content: textContent,
-        }
-      },
-    )
-
-    // Filter out any messages with empty content
-    const validMessages = transformedMessages.filter((m: { content: string | object[] }) => {
-      if (typeof m.content === "string") {
-        return m.content.trim().length > 0
-      }
-      return true // Keep multimodal messages
-    })
-
-    if (validMessages.length === 0) {
-      return new Response(JSON.stringify({ error: "No valid messages to process" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      })
-    }
-
-    const result = streamText({
-      model: selectedModel,
-      messages: validMessages,
-      system: `You are a helpful, friendly AI assistant and expert web developer. You provide clear, concise, and accurate responses.
+const SYSTEM_PROMPT = `You are a helpful, friendly AI assistant and expert web developer. You provide clear, concise, and accurate responses.
 
 When generating HTML/CSS:
 - Always produce complete, self-contained HTML documents with <!DOCTYPE html>, <html>, <head>, and <body> tags
@@ -89,7 +17,104 @@ When generating HTML/CSS:
 
 When explaining code or technical concepts, use markdown formatting with code blocks where appropriate.
 Be conversational but professional. If you're unsure about something, say so honestly.
-When analyzing images, describe them in detail and answer any questions about them.`,
+When analyzing images, describe them in detail and answer any questions about them.`
+
+function parseModelId(modelId: string): { provider: string; name: string } {
+  const slashIndex = modelId.indexOf("/")
+  if (slashIndex === -1) return { provider: "openai", name: modelId }
+  return { provider: modelId.slice(0, slashIndex), name: modelId.slice(slashIndex + 1) }
+}
+
+function buildModel(modelId: string, customEndpoint?: string, customKey?: string) {
+  const { provider, name } = parseModelId(modelId)
+
+  const openaiConfig: OpenAIProviderSettings = {
+    apiKey: customKey || process.env.OPENAI_API_KEY,
+    ...(customEndpoint ? { baseURL: customEndpoint } : {}),
+  }
+  const openai = createOpenAI(openaiConfig)
+
+  if (provider === "openai" || customEndpoint) {
+    return openai(name)
+  }
+
+  if (provider === "google" || provider === "gemini") {
+    const googleConfig: GoogleGenerativeAIProviderSettings = {
+      apiKey: customKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      ...(customEndpoint ? { baseURL: customEndpoint } : {}),
+    }
+    const google = createGoogleGenerativeAI(googleConfig)
+    return google(name)
+  }
+
+  // Anthropic, Groq, etc — route through OpenAI-compatible endpoint
+  if (provider === "anthropic" || provider === "groq" || provider === "cat" || provider === "xai") {
+    return openai(name)
+  }
+
+  // Fallback to OpenAI
+  return openai(name)
+}
+
+export async function POST(req: Request) {
+  try {
+    const { messages, model, customApiEndpoint, customApiKey } = await req.json()
+
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: "Invalid request: messages array required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
+    const selectedModel = model || "google/gemini-2.0-flash-001"
+    const aiModel = buildModel(selectedModel, customApiEndpoint, customApiKey)
+
+    const lastIndex = messages.length - 1
+    const transformedMessages = messages.map(
+      (m: { role: string; content: string; imageData?: string }, index: number) => {
+        const isLastUserMessage = index === lastIndex && m.role === "user"
+
+        if (isLastUserMessage && m.imageData && m.imageData.startsWith("data:image/")) {
+          return {
+            role: m.role as "user" | "assistant",
+            content: [
+              { type: "image" as const, image: m.imageData },
+              { type: "text" as const, text: m.content || "Describe this image in detail." },
+            ],
+          }
+        }
+
+        let textContent = m.content
+        if (m.imageData && !isLastUserMessage) {
+          textContent = m.content || "[User shared an image]"
+        }
+
+        return {
+          role: m.role as "user" | "assistant",
+          content: textContent,
+        }
+      },
+    )
+
+    const validMessages = transformedMessages.filter((m: { content: string | object[] }) => {
+      if (typeof m.content === "string") {
+        return m.content.trim().length > 0
+      }
+      return true
+    })
+
+    if (validMessages.length === 0) {
+      return new Response(JSON.stringify({ error: "No valid messages to process" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
+    }
+
+    const result = streamText({
+      model: aiModel,
+      messages: validMessages,
+      system: SYSTEM_PROMPT,
     })
 
     return result.toTextStreamResponse()
