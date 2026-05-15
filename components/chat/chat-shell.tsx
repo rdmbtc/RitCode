@@ -183,18 +183,58 @@ export function ChatShell() {
         }
 
         let accumulatedContent = ""
+        let buffer = ""
 
         while (true) {
           const { done, value } = await reader.read()
 
           if (done) break
 
-          const chunk = decoder.decode(value, { stream: true })
-          accumulatedContent += chunk
+          buffer += decoder.decode(value, { stream: true })
 
-          setMessages((prev) =>
-            prev.map((msg) => (msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg)),
-          )
+          // Process complete SSE events (separated by \n\n)
+          const parts = buffer.split("\n\n")
+          // Keep the last part in buffer (might be incomplete)
+          buffer = parts.pop() || ""
+
+          for (const part of parts) {
+            const lines = part.split("\n")
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const jsonStr = line.slice(6).trim()
+                if (!jsonStr || jsonStr === "[DONE]") continue
+
+                try {
+                  const data = JSON.parse(jsonStr)
+                  let text = ""
+
+                  // AI SDK format: { type: "text", text: "..." }
+                  if (data.type === "text" && typeof data.text === "string") {
+                    text = data.text
+                  }
+                  // OpenAI-compatible format: { choices: [{ delta: { content: "..." } }] }
+                  else if (data.choices?.[0]?.delta?.content) {
+                    text = data.choices[0].delta.content
+                  }
+                  // Fallback: if the whole thing is a text string
+                  else if (typeof data === "string") {
+                    text = data
+                  }
+
+                  if (text) {
+                    accumulatedContent += text
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                      ),
+                    )
+                  }
+                } catch {
+                  // Not valid JSON yet — could be partial, skip for now
+                }
+              }
+            }
+          }
         }
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") {

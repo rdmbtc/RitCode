@@ -1,6 +1,6 @@
-import { streamText } from "ai"
-import { createOpenAI, OpenAIProviderSettings } from "@ai-sdk/openai"
-import { createGoogleGenerativeAI, GoogleGenerativeAIProviderSettings } from "@ai-sdk/google"
+import { streamText, type LanguageModel } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
+import { createGoogleGenerativeAI } from "@ai-sdk/google"
 
 const SYSTEM_PROMPT = `You are a helpful, friendly AI assistant and expert web developer. You provide clear, concise, and accurate responses.
 
@@ -25,35 +25,91 @@ function parseModelId(modelId: string): { provider: string; name: string } {
   return { provider: modelId.slice(0, slashIndex), name: modelId.slice(slashIndex + 1) }
 }
 
-function buildModel(modelId: string, customEndpoint?: string, customKey?: string) {
+function buildModel(modelId: string): LanguageModel {
   const { provider, name } = parseModelId(modelId)
 
-  const openaiConfig: OpenAIProviderSettings = {
-    apiKey: customKey || process.env.OPENAI_API_KEY,
-    ...(customEndpoint ? { baseURL: customEndpoint } : {}),
-  }
-  const openai = createOpenAI(openaiConfig)
-
-  if (provider === "openai" || customEndpoint) {
-    return openai(name)
-  }
-
+  // Google / Gemini
   if (provider === "google" || provider === "gemini") {
-    const googleConfig: GoogleGenerativeAIProviderSettings = {
-      apiKey: customKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      ...(customEndpoint ? { baseURL: customEndpoint } : {}),
-    }
-    const google = createGoogleGenerativeAI(googleConfig)
+    const google = createGoogleGenerativeAI({
+      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    })
     return google(name)
   }
 
-  // Anthropic, Groq, etc — route through OpenAI-compatible endpoint
-  if (provider === "anthropic" || provider === "groq" || provider === "cat" || provider === "xai") {
+  // OpenAI
+  if (provider === "openai") {
+    const openai = createOpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
     return openai(name)
   }
 
-  // Fallback to OpenAI
+  // Anthropic, Groq, xAI, and others via OpenAI-compatible SDK
+  if (provider === "anthropic" || provider === "groq" || provider === "xai") {
+    const openai = createOpenAI({
+      apiKey: process.env[`${provider.toUpperCase()}_API_KEY`] || process.env.OPENAI_API_KEY || "sk-placeholder",
+    })
+    return openai(name)
+  }
+
+  // Fallback: OpenAI SDK
+  const openai = createOpenAI({
+    apiKey: process.env.OPENAI_API_KEY || "sk-placeholder",
+  })
   return openai(name)
+}
+
+/**
+ * When a custom API endpoint is set, proxy directly to that endpoint.
+ * This handles OpenAI-compatible APIs without AI SDK wrapping.
+ */
+async function proxyCustomApi(
+  messages: any[],
+  model: string,
+  endpoint: string,
+  apiKey?: string,
+): Promise<Response> {
+  const url = endpoint.endsWith("/v1/chat/completions")
+    ? endpoint
+    : endpoint.replace(/\/+$/, "") + "/v1/chat/completions"
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`
+  }
+
+  const externalResponse = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      system: SYSTEM_PROMPT,
+    }),
+  })
+
+  if (!externalResponse.ok) {
+    const errorBody = await externalResponse.text().catch(() => "")
+    throw new Error(`Custom API error ${externalResponse.status}: ${errorBody}`)
+  }
+
+  // Forward the SSE stream directly
+  const body = externalResponse.body
+  if (!body) {
+    throw new Error("No response body from custom API")
+  }
+
+  // Return the raw SSE stream to the client
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  })
 }
 
 export async function POST(req: Request) {
@@ -68,7 +124,14 @@ export async function POST(req: Request) {
     }
 
     const selectedModel = model || "google/gemini-2.0-flash-001"
-    const aiModel = buildModel(selectedModel, customApiEndpoint, customApiKey)
+
+    // Custom API endpoint — proxy directly
+    if (customApiEndpoint) {
+      return proxyCustomApi(messages, selectedModel, customApiEndpoint, customApiKey)
+    }
+
+    // Use AI SDK providers
+    const aiModel = buildModel(selectedModel)
 
     const lastIndex = messages.length - 1
     const transformedMessages = messages.map(
