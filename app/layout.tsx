@@ -9,8 +9,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AI Chat Assistant",
-  description: "Chat with our AI assistant powered by Gemini",
+  title: "RitCode",
+  description: "Builded by @rdmnad special for Ritual Community <3",
   generator: "v0.app",
   icons: {
     icon: [

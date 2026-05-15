@@ -143,7 +143,7 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
             <AnimatedOrb size={128} />
           </div>
           <p className={`text-base sm:text-lg font-medium text-zinc-300 ${hasAnimated ? "text-blur-intro" : ""}`}>
-            Hi, my name is Jarvis
+            Hi, I'm RitCode
           </p>
           <p className={`text-xs sm:text-sm mt-1 text-zinc-500 ${hasAnimated ? "text-blur-intro-delay" : ""}`}>
             Send a message to begin chatting with the AI assistant

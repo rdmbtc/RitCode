@@ -434,7 +434,7 @@ export function ChatShell() {
       {/* Credits Footer */}
       <div className="absolute bottom-24 left-0 right-0 text-center pointer-events-none">
         <p className="text-xs text-zinc-600">
-          @rdmnad special for Ritual Community
+          Builded by @rdmnad special for Ritual Community &lt;3
         </p>
       </div>
 

@@ -2,8 +2,8 @@ import { ChatShell } from "@/components/chat/chat-shell"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "Ritual AI Assistant",
-  description: "Chat with Ritual AI - @rdmnad special for Ritual Community",
+  title: "RitCode — Ritual AI Assistant",
+  description: "Builded by @rdmnad special for Ritual Community <3",
 }
 
 export default function ChatPage() {
