@@ -95,16 +95,16 @@ export function setCurrentConversationId(id: string | null): void {
 // Settings
 export function getSettings(): AppSettings {
   if (typeof window === "undefined") {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "anthropic/minimax-m2.5-free" }
   }
   const data = localStorage.getItem(SETTINGS_KEY)
   if (!data) {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "anthropic/minimax-m2.5-free" }
   }
   try {
     return JSON.parse(data) as AppSettings
   } catch {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "anthropic/minimax-m2.5-free" }
   }
 }
 

@@ -48,7 +48,8 @@ function buildModel(modelId: string): LanguageModel {
   if (provider === "anthropic" || provider === "groq" || provider === "xai") {
     const key = process.env[`${provider.toUpperCase()}_API_KEY`] || process.env.OPENAI_API_KEY
     if (!key) throw new Error(`${provider.toUpperCase()}_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.`)
-    const openai = createOpenAI({ apiKey: key })
+    const baseURL = process.env[`${provider.toUpperCase()}_BASE_URL`]
+    const openai = createOpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}) })
     return openai(name)
   }
 
@@ -123,7 +124,7 @@ export async function POST(req: Request) {
       })
     }
 
-    const selectedModel = model || "google/gemini-2.0-flash-001"
+    const selectedModel = model || process.env.AI_MODEL || "anthropic/minimax-m2.5-free"
 
     // Custom API endpoint — proxy directly
     if (customApiEndpoint) {

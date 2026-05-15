@@ -30,7 +30,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
     customApiEndpoint: "",
     customApiKey: "",
     useCustomApi: false,
-    selectedModel: "google/gemini-2.0-flash-001",
+    selectedModel: "anthropic/minimax-m2.5-free",
   })
   const [customModelValue, setCustomModelValue] = useState("")
   const [useCustomModel, setUseCustomModel] = useState(false)

@@ -32,7 +32,7 @@ export function ChatShell() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [abortController, setAbortController] = useState<AbortController | null>(null)
-  const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
+  const [selectedModel, setSelectedModel] = useState<AIModel>("anthropic/minimax-m2.5-free")
   const [isLoaded, setIsLoaded] = useState(false)
 
   // New state for features
