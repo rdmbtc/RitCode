@@ -78,6 +78,65 @@ LLM fees: total_gas × 1gwei (model-dependent via ModelPricingRegistry).
 - "insufficient deposit" — need to fund RitualWallet before submitting
 - "no executor" — no executor available, retry shortly
 - "job expired" — TTL exceeded, increase TTL or retry
+
+## Ritual dApp Builder Reference
+
+When asked to build a complete dApp on Ritual, follow these phases:
+
+### Phase 0: Intake & Feature Selection
+Parse user's idea, present feature picker:
+- HTTP API calls (0x0801)
+- LLM inference (0x0802) + Streaming
+- Agent execution (0x0820 / 0x080C)
+- Long-running tasks (0x0805)
+- Image/Audio/Video generation (0x0818 / 0x0819 / 0x081A)
+- Scheduled operations
+- Private outputs / Delegated secrets
+- ZK proofs (0x0806)
+
+### Architecture Decision Rules
+1. **On-Chain-First**: If Ritual has an on-chain primitive, use it. Scheduled tasks → Scheduler, external data → HTTP precompile, AI → LLM precompile, secrets → Secrets precompile.
+2. **SPC Constraint**: Only ONE SPC call per transaction. Multiple SPCs need separate TXs via Scheduler chaining.
+3. **State Persistence**: Synchronous (ONNX, JQ) and SPC (HTTP, LLM) state writes persist in same TX. Two-phase async (Long HTTP, ZK, Agent, Image, Audio, Video) split across submit TX + callback TX.
+4. **writeContractAsync breaks on async precompiles** — use useSendTransaction + encodeFunctionData instead.
+5. **Fees via RitualWallet deposit**, not msg.value gas. Fund RitualWallet before submitting async calls.
+6. **msg.sender in callbacks = AsyncDelivery (0x5A16...39F6)**, not the original user.
+7. **Do NOT use Infernet** — deprecated, replaced by enshrined precompiles.
+
+### Phase 2: Smart Contracts
+- Inherit base contracts, fund via RitualWallet.deposit{value: X}(lockDuration)
+- Emit events for every state transition
+- Access control (onlyOwner, onlyCallback)
+- Handle SPC settlement decoding and callback delivery failures
+- Custom errors (not require strings) for gas efficiency
+- NatSpec on all public functions
+
+### Phase 3: Frontend
+- Handle all 9 async transaction states: SUBMITTING → PENDING_COMMITMENT → COMMITTED → EXECUTOR_PROCESSING → RESULT_READY → PENDING_SETTLEMENT → SETTLED | FAILED | EXPIRED
+- Show loading states with estimated wait times
+- Display errors with actionable messages (not raw hex)
+- RitualWallet integration for automatic fee management
+- wagmi hooks for all chain interactions
+- Responsive dark-mode-first Ritual theme
+- No hardcoded addresses — use environment variables
+
+### Phase 4: Backend (only if needed)
+Needed when: event indexing, webhooks, custom REST API, or high-throughput queue processing.
+- Event-driven architecture subscribing to contract events
+- Idempotent event handlers (safe to replay)
+- Health check endpoint, structured logging
+
+### Phase 5: Integration
+- Frontend → Contract calls with proper fee locking
+- Contract → Precompile calls with correct encoding
+- Settlement events / callback delivery → Frontend event subscription
+- Wallet → Auto-deposit and balance monitoring
+
+### Data Not Available On-Chain
+If data does not come from msg.sender, block.*, tx.*, or contract storage, you need the HTTP precompile (0x0801). Examples: TX counts, historical block data beyond 256 blocks, external APIs, GitHub repos, other chain gas prices.
+
+### Encrypted Output Limitation
+When userPublicKey is set, contract receives opaque ECIES ciphertext — it cannot decrypt, parse, or branch on content. For on-chain branching, leave userPublicKey empty and encrypt separately.
 `
 
 function parseModelId(modelId: string): { provider: string; name: string } {
