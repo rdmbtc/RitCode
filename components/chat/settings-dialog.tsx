@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type AppSettings, getSettings, saveSettings } from "@/lib/chat-storage"
 import { AI_MODELS, type AIModel } from "./composer"
+import { CodeMint } from "./code-mint"
 
 interface SettingsDialogProps {
   open: boolean
@@ -24,7 +25,6 @@ interface SettingsDialogProps {
 }
 
 const PRESET_MODELS = [
-  { id: "anthropic/minimax-m2.5-free", name: "MiniMax M2.5" },
   ...AI_MODELS.map((m) => ({ id: m.id, name: m.name })),
 ]
 
@@ -143,6 +143,12 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
               className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white text-zinc-400"
             >
               API
+            </TabsTrigger>
+            <TabsTrigger
+              value="mint"
+              className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white text-zinc-400"
+            >
+              Mint
             </TabsTrigger>
           </TabsList>
 
@@ -289,6 +295,16 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
                   {testMessage}
                 </span>
               )}
+            </div>
+          </TabsContent>
+
+          {/* Mint tab — Code minting on Ritual chain */}
+          <TabsContent value="mint" className="mt-4 space-y-4">
+            <div>
+              <p className="text-sm text-zinc-400 mb-4">
+                Save code to Ritual blockchain via MetaMask. Code stored as transaction data with mint call.
+              </p>
+              <CodeMint contractAddress="0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948" />
             </div>
           </TabsContent>
         </Tabs>

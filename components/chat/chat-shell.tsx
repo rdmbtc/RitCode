@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MessageSquareDashed, Wallet, History, Settings } from "lucide-react"
+import { MessageSquareDashed, History, Settings } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { ChatHistory } from "./chat-history"
 import { SettingsDialog } from "./settings-dialog"
+import { WalletConnector } from "./wallet-connector"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import {
@@ -399,23 +400,13 @@ export function ChatShell() {
             <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
           </Button>
 
-          {/* Connect Wallet Button - hidden on small screens */}
-          <Button
-            variant="outline"
-            className="hidden sm:flex bg-transparent border-zinc-700 text-white hover:bg-zinc-900 hover:text-white rounded-full px-4 gap-2"
-          >
-            <Wallet className="w-4 h-4" />
-            Connect Wallet
-          </Button>
-          {/* Wallet icon only on mobile */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="sm:hidden h-9 w-9 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400"
-            aria-label="Connect Wallet"
-          >
-            <Wallet className="w-4 h-4" />
-          </Button>
+          {/* Wallet Connector */}
+          <div className="hidden sm:block">
+            <WalletConnector />
+          </div>
+          <div className="sm:hidden">
+            <WalletConnector />
+          </div>
         </div>
       </div>
 
