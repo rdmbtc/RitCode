@@ -195,7 +195,6 @@ export function ChatShell() {
           buffer += decoder.decode(value, { stream: true })
 
           if (!hasCheckedFormat) {
-            console.log("[chat] first chunk:", buffer.slice(0, 300))
             // Detect format: SSE (data:) or AI SDK text stream (raw JSON)
             isSSE = buffer.includes("data: ")
             hasCheckedFormat = true
@@ -312,7 +311,7 @@ export function ChatShell() {
           }
         }
 
-        console.log("[chat] stream ended, accumulated:", accumulatedContent.slice(0, 100))
+
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") {
           setMessages((prev) =>

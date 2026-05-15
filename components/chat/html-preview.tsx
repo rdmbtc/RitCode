@@ -279,8 +279,14 @@ interface CodeBlockWithPreviewProps {
 export function CodeBlockWithPreview({ code, language }: CodeBlockWithPreviewProps) {
   const [showPreview, setShowPreview] = useState(false)
 
-  const isPreviewable = 
+  const isHTML =
     language === "html" ||
+    language === "htm" ||
+    code.trim().startsWith("<!DOCTYPE") ||
+    code.trim().startsWith("<html")
+
+  const isPreviewable =
+    isHTML ||
     language === "css" ||
     code.includes("<div") ||
     code.includes("<section") ||
@@ -292,7 +298,13 @@ export function CodeBlockWithPreview({ code, language }: CodeBlockWithPreviewPro
     code.includes("<main") ||
     code.includes("<article")
 
-  if (showPreview) {
+  // Auto-show preview for HTML code — always render inline
+  if (isHTML) {
+    return <HtmlPreview code={code} language={language} onClose={() => {}} />
+  }
+
+  // Other code types: show preview on click
+  if (showPreview && isPreviewable) {
     return <HtmlPreview code={code} language={language} onClose={() => setShowPreview(false)} />
   }
 
@@ -306,7 +318,7 @@ export function CodeBlockWithPreview({ code, language }: CodeBlockWithPreviewPro
         <Button
           onClick={() => setShowPreview(true)}
           size="sm"
-          className="absolute top-2 right-2 h-7 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 h-7 bg-zinc-700 hover:bg-zinc-600 text-zinc-100 gap-1.5 opacity-100 transition-opacity"
         >
           <Eye className="h-3.5 w-3.5" />
           Preview
