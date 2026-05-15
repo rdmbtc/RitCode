@@ -1,23 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi"
+import { useAccount } from "wagmi"
 import { X, Code, Eye, Copy, Check, Maximize2, Minimize2, RefreshCw, Monitor, Tablet, Smartphone, Lock, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-
-const CODE_MINT_ADDRESS = "0x5b69332815068e23433d1d2daa80cdd24e5a0d7f"
-const MINT_PRICE_WEI = 1000000000000000n // 0.001 RITUAL
-
-const CODE_MINT_ABI = [
-  {
-    inputs: [{ name: "_code", type: "string" }],
-    name: "mintCode",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "payable",
-    type: "function",
-  },
-] as const
 
 interface HtmlPreviewProps {
   code: string
@@ -32,43 +19,15 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // Check if user already unlocked this code
+  // Lock state
   const { address, isConnected } = useAccount()
   const [isUnlocked, setIsUnlocked] = useState(false)
-  const [showMint, setShowMint] = useState(false)
 
   useEffect(() => {
     if (!address) return
-    const key = `unlocked-code-${code.substring(0, 50)}-${address}`
+    const key = `unlocked-html-${address}`
     if (localStorage.getItem(key)) setIsUnlocked(true)
-  }, [address, code])
-
-  const { data: hash, error: writeError, isPending: writing, writeContract } = useWriteContract()
-  const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash })
-
-  useEffect(() => {
-    if (confirmed && hash) {
-      setIsUnlocked(true)
-      if (address) {
-        const key = `unlocked-code-${code.substring(0, 50)}-${address}`
-        localStorage.setItem(key, hash)
-      }
-    }
-  }, [confirmed, hash, address, code])
-
-  const handleMint = async () => {
-    try {
-      await writeContract({
-        address: CODE_MINT_ADDRESS,
-        abi: CODE_MINT_ABI,
-        functionName: "mintCode",
-        args: [code.substring(0, 200)], // Store first 200 chars as code reference
-        value: MINT_PRICE_WEI,
-      })
-    } catch (err) {
-      console.error("Mint error:", err)
-    }
-  }
+  }, [address])
 
   const generateHtml = useCallback((sourceCode: string, lang?: string) => {
     if (lang === "html" || sourceCode.trim().startsWith("<!DOCTYPE") || sourceCode.trim().startsWith("<html")) {
@@ -76,40 +35,18 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
     }
     if (lang === "jsx" || lang === "tsx" || lang === "javascript" || lang === "typescript") {
       return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>body{margin:0;padding:16px;font-family:system-ui,-apple-system,sans-serif;background:#fafafa}</style>
-</head>
-<body>
-  <div id="root">
-    <pre style="background:#1a1a1a;color:#e5e5e5;padding:16px;border-radius:8px;overflow:auto">
-      <code>${escapeHtml(sourceCode)}</code>
-    </pre>
-  </div>
-</body>
-</html>`
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"><\/script>
+<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif;background:#fafafa}</style></head>
+<body><pre style="background:#1a1a1a;color:#e5e5e5;padding:16px;border-radius:8px;overflow:auto"><code>${escapeHtml(sourceCode)}</code></pre></body></html>`
     }
     if (lang === "css") {
-      return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CSS Preview</title>
-<style>${sourceCode}</style>
-<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif}.preview-box{padding:20px;border:1px solid #ddd;border-radius:8px}</style>
-</head>
-<body><div class="preview-box"><h1>Heading 1</h1><h2>Heading 2</h2><p>Styled paragraph</p><button>Button</button><a href="#">Link</a></div></body>
-</html>`
+      return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<style>${sourceCode}body{margin:0;padding:16px;font-family:system-ui,sans-serif}.box{padding:20px;border:1px solid #ddd;border-radius:8px}</style></head>
+<body><div class="box"><h1>Heading</h1><p>Styled content</p><button>Button</button></div></body></html>`
     }
-    return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Preview</title>
-<script src="https://cdn.tailwindcss.com"><\/script>
-</head>
-<body>${sourceCode}</body>
-</html>`
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"><\/script></head><body>${sourceCode}</body></html>`
   }, [])
 
   const escapeHtml = (text: string) =>
@@ -124,6 +61,7 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
   useEffect(() => { refreshPreview() }, [refreshPreview])
 
   const handleCopy = async () => {
+    if (!isUnlocked) return
     await navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -148,18 +86,10 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
               <Eye className="h-4 w-4" /> Preview
             </button>
             <button
-              onClick={() => {
-                if (!isUnlocked) {
-                  setShowMint(true)
-                  setActiveTab("code")
-                } else {
-                  setActiveTab("code")
-                }
-              }}
+              onClick={() => setActiveTab("code")}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-                activeTab === "code" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-100",
-                !isUnlocked && "opacity-80"
+                activeTab === "code" ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-100"
               )}
             >
               {isUnlocked ? <Code className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
@@ -169,7 +99,6 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Device mode toggle */}
           <div className="flex items-center gap-1 mr-2 border-r border-zinc-700 pr-2">
             {[
               { mode: "desktop" as const, icon: Monitor },
@@ -195,10 +124,9 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
           <Button
             variant="ghost" size="icon"
             onClick={handleCopy}
-            disabled={!isUnlocked}
             className={cn(
               "h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800",
-              !isUnlocked && "opacity-30 cursor-not-allowed"
+              !isUnlocked && "opacity-30 cursor-not-allowed pointer-events-none"
             )}
           >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -225,18 +153,41 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
               <iframe ref={iframeRef} className="w-full h-full" sandbox="allow-scripts allow-same-origin" title="Preview" />
             </div>
           </div>
-        ) : showMint && !isUnlocked ? (
-          <MintToUnlock
-            code={code}
-            onMint={handleMint}
-            writing={writing}
-            confirming={confirming}
-            confirmed={confirmed}
-            writeError={writeError}
-            onUnlock={() => { setShowMint(false); setIsUnlocked(true) }}
-            isConnected={isConnected}
-          />
+        ) : !isUnlocked ? (
+          /* Locked view — NO raw code in DOM */
+          <div className="h-full flex flex-col items-center justify-center bg-zinc-900 px-6">
+            <div className="max-w-md text-center space-y-6">
+              <div className="w-16 h-16 rounded-full bg-amber-900/20 border border-amber-800/30 flex items-center justify-center mx-auto">
+                <Lock className="w-8 h-8 text-amber-400" />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">Unlock Source Code</h3>
+                <p className="text-sm text-zinc-400">
+                  Mint this code to the Ritual blockchain for <span className="text-white font-semibold">0.001 RITUAL</span>.
+                  The code will be stored on-chain permanently.
+                </p>
+              </div>
+
+              {/* Placeholder preview — no actual code */}
+              <div className="relative rounded-lg overflow-hidden border border-zinc-800 bg-zinc-800/50 h-24 flex items-center justify-center">
+                <div className="flex items-center gap-2 text-zinc-600">
+                  <Lock className="w-5 h-5" />
+                  <span className="text-sm font-mono">Code hidden until minted</span>
+                </div>
+              </div>
+
+              {!isConnected ? (
+                <div className="bg-zinc-800 rounded-lg px-4 py-3 border border-zinc-700">
+                  <p className="text-sm text-zinc-400">Connect your wallet to mint and unlock</p>
+                </div>
+              ) : (
+                <MintButton code={code} />
+              )}
+            </div>
+          </div>
         ) : (
+          /* Unlocked — show actual code */
           <div className="h-full w-full overflow-auto p-4 bg-zinc-900">
             <pre className="text-sm text-zinc-300 font-mono whitespace-pre-wrap">
               <code>{code}</code>
@@ -248,83 +199,81 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
   )
 }
 
-function MintToUnlock({
-  code, onMint, writing, confirming, confirmed, writeError, onUnlock, isConnected
-}: {
-  code: string
-  onMint: () => void
-  writing: boolean
-  confirming: boolean
-  confirmed: boolean
-  writeError: Error | null
-  onUnlock: () => void
-  isConnected: boolean
-}) {
+function MintButton({ code }: { code: string }) {
+  const { useWriteContract, useWaitForTransactionReceipt, useAccount } = require("wagmi")
+  const { writeContract, data: hash, error: writeError, isPending: writing } = useWriteContract()
+  const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash })
+  const { address } = useAccount()
+
+  const CODE_MINT_ADDRESS = "0x5b69332815068e23433d1d2daa80cdd24e5a0d7f"
+  const MINT_PRICE_WEI = 1000000000000000n
+
+  const CODE_MINT_ABI = [
+    {
+      inputs: [{ name: "_code", type: "string" }],
+      name: "mintCode",
+      outputs: [{ name: "", type: "uint256" }],
+      stateMutability: "payable",
+      type: "function",
+    },
+  ] as const
+
+  useEffect(() => {
+    if (confirmed && address) {
+      localStorage.setItem(`unlocked-html-${address}`, hash || "")
+      window.dispatchEvent(new CustomEvent("code-unlocked"))
+    }
+  }, [confirmed, hash, address])
+
+  const handleMint = async () => {
+    try {
+      await writeContract({
+        address: CODE_MINT_ADDRESS,
+        abi: CODE_MINT_ABI,
+        functionName: "mintCode",
+        args: [code.substring(0, 200)],
+        value: MINT_PRICE_WEI,
+      })
+    } catch (err) {
+      console.error("Mint error:", err)
+    }
+  }
+
   if (confirmed) {
-    onUnlock()
-    return null
+    return (
+      <div className="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center gap-2">
+        <Check className="w-4 h-4 text-green-400" />
+        <span className="text-sm text-green-300">Code unlocked!</span>
+      </div>
+    )
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-zinc-900 px-6">
-      <div className="max-w-md text-center space-y-6">
-        <div className="w-16 h-16 rounded-full bg-amber-900/20 border border-amber-800/30 flex items-center justify-center mx-auto">
-          <Lock className="w-8 h-8 text-amber-400" />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold text-white mb-2">Unlock Source Code</h3>
-          <p className="text-sm text-zinc-400">
-            Mint this code to the Ritual blockchain for <span className="text-white font-semibold">0.001 RITUAL</span>.
-            The code will be stored on-chain as your NFT.
-          </p>
-        </div>
-
-        {/* Code preview (blurred) */}
-        <div className="relative rounded-lg overflow-hidden border border-zinc-800">
-          <div className="filter blur-sm select-none opacity-40 max-h-24 overflow-hidden p-3">
-            <pre className="text-xs text-zinc-500 font-mono whitespace-pre-wrap break-all">{code}</pre>
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-zinc-900/90 px-4 py-2 rounded-lg flex items-center gap-2">
-              <Lock className="w-4 h-4 text-amber-400" />
-              <span className="text-sm text-amber-400">Mint to unlock</span>
-            </div>
-          </div>
-        </div>
-
-        {!isConnected ? (
-          <div className="bg-zinc-800 rounded-lg px-4 py-3 border border-zinc-700">
-            <p className="text-sm text-zinc-400">Connect your wallet to mint</p>
-          </div>
+    <>
+      <Button
+        onClick={handleMint}
+        disabled={writing || confirming}
+        className="w-full bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50"
+      >
+        {writing || confirming ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+            {confirming ? "Confirming..." : "Minting..."}
+          </>
         ) : (
-          <Button
-            onClick={onMint}
-            disabled={writing || confirming}
-            className="w-full bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50"
-          >
-            {writing || confirming ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                {confirming ? "Confirming..." : "Minting..."}
-              </>
-            ) : (
-              <>
-                <Key className="w-4 h-4 mr-2" />
-                Mint & Unlock — 0.001 RITUAL
-              </>
-            )}
-          </Button>
+          <>
+            <Key className="w-4 h-4 mr-2" />
+            Mint & Unlock — 0.001 RITUAL
+          </>
         )}
-
-        {writeError && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-red-900/20 border border-red-800/50 rounded-lg">
-            <X className="w-4 h-4 text-red-400 shrink-0" />
-            <span className="text-xs text-red-300">{writeError.message}</span>
-          </div>
-        )}
-      </div>
-    </div>
+      </Button>
+      {writeError && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-red-900/20 border border-red-800/50 rounded-lg">
+          <X className="w-4 h-4 text-red-400 shrink-0" />
+          <span className="text-xs text-red-300">{writeError.message}</span>
+        </div>
+      )}
+    </>
   )
 }
 
