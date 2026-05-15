@@ -216,9 +216,16 @@ export function ChatShell() {
                     const data = JSON.parse(jsonStr)
                     let text = ""
 
-                    if (data.choices?.[0]?.delta?.content) {
+                    // AI SDK text-delta format: { type: "text-delta", textDelta: "..." }
+                    if (data.type === "text-delta" && typeof data.textDelta === "string") {
+                      text = data.textDelta
+                    }
+                    // OpenAI-compatible SSE: { choices: [{ delta: { content: "..." } }] }
+                    else if (data.choices?.[0]?.delta?.content) {
                       text = data.choices[0].delta.content
-                    } else if (typeof data === "string") {
+                    }
+                    // Fallback: raw string
+                    else if (typeof data === "string") {
                       text = data
                     }
 
