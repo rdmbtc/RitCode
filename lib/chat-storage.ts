@@ -20,6 +20,7 @@ export interface AppSettings {
   customApiEndpoint: string
   customApiKey: string
   useCustomApi: boolean
+  selectedModel: string
 }
 
 const CONVERSATIONS_KEY = "ritual-chat-conversations"
@@ -94,16 +95,16 @@ export function setCurrentConversationId(id: string | null): void {
 // Settings
 export function getSettings(): AppSettings {
   if (typeof window === "undefined") {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
   }
   const data = localStorage.getItem(SETTINGS_KEY)
   if (!data) {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
   }
   try {
     return JSON.parse(data) as AppSettings
   } catch {
-    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false }
+    return { customApiEndpoint: "", customApiKey: "", useCustomApi: false, selectedModel: "google/gemini-2.0-flash-001" }
   }
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { Settings, CheckCircle2, XCircle, Loader2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { type AppSettings, getSettings, saveSettings } from "@/lib/chat-storage"
+import { AI_MODELS, type AIModel } from "./composer"
 
 interface SettingsDialogProps {
   open: boolean
@@ -22,26 +23,58 @@ interface SettingsDialogProps {
   onSettingsChange?: (settings: AppSettings) => void
 }
 
+const PRESET_MODELS = AI_MODELS.map((m) => ({ id: m.id, name: m.name }))
+
 export function SettingsDialog({ open, onOpenChange, onSettingsChange }: SettingsDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({
     customApiEndpoint: "",
     customApiKey: "",
     useCustomApi: false,
+    selectedModel: "google/gemini-2.0-flash-001",
   })
+  const [customModelValue, setCustomModelValue] = useState("")
+  const [useCustomModel, setUseCustomModel] = useState(false)
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle")
   const [testMessage, setTestMessage] = useState("")
 
   useEffect(() => {
     if (open) {
-      setSettings(getSettings())
+      const loaded = getSettings()
+      setSettings(loaded)
       setTestStatus("idle")
       setTestMessage("")
+
+      const isPreset = PRESET_MODELS.some((m) => m.id === loaded.selectedModel)
+      if (isPreset) {
+        setUseCustomModel(false)
+        setCustomModelValue("")
+      } else {
+        setUseCustomModel(true)
+        setCustomModelValue(loaded.selectedModel || "")
+      }
     }
   }, [open])
 
+  const handleModelSelect = (modelId: string) => {
+    setUseCustomModel(false)
+    setSettings({ ...settings, selectedModel: modelId })
+  }
+
+  const handleCustomModelChange = (value: string) => {
+    setCustomModelValue(value)
+    setUseCustomModel(true)
+    if (value.trim()) {
+      setSettings({ ...settings, selectedModel: value.trim() })
+    }
+  }
+
   const handleSave = () => {
-    saveSettings(settings)
-    onSettingsChange?.(settings)
+    const finalModel = useCustomModel && customModelValue.trim()
+      ? customModelValue.trim()
+      : settings.selectedModel
+    const finalSettings = { ...settings, selectedModel: finalModel }
+    saveSettings(finalSettings)
+    onSettingsChange?.(finalSettings)
     onOpenChange(false)
   }
 
@@ -69,7 +102,6 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
       })
 
       if (response.ok || response.status === 400) {
-        // 400 might mean bad request format but endpoint is reachable
         setTestStatus("success")
         setTestMessage("Connection successful")
       } else {
@@ -84,7 +116,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-[500px]">
+      <DialogContent className="bg-zinc-950 border border-zinc-800 text-zinc-100 sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-zinc-100">
             <Settings className="h-5 w-5" />
@@ -96,31 +128,87 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
         </DialogHeader>
 
         <Tabs defaultValue="general" className="mt-4">
-          <TabsList className="bg-zinc-900 border border-zinc-800">
+          <TabsList className="bg-zinc-800 border-0">
             <TabsTrigger
               value="general"
-              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+              className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white text-zinc-400"
             >
               General
             </TabsTrigger>
             <TabsTrigger
               value="api"
-              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+              className="data-[state=active]:bg-zinc-700 data-[state=active]:text-white text-zinc-400"
             >
-              API Configuration
+              API
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" className="mt-4 space-y-4">
-            <div className="text-sm text-zinc-400">
-              General settings coming soon. Configure your chat experience here.
+          {/* General tab — Model Selection */}
+          <TabsContent value="general" className="mt-4 space-y-5">
+            <div>
+              <Label className="text-zinc-200 mb-2 block">AI Model</Label>
+              <div className="space-y-2">
+                {PRESET_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => handleModelSelect(model.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors text-left ${
+                      !useCustomModel && settings.selectedModel === model.id
+                        ? "bg-zinc-800 border-zinc-600 text-zinc-100"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+                    }`}
+                  >
+                    <span className="text-sm">{model.name}</span>
+                    <span className="text-xs text-zinc-500 font-mono">{model.id}</span>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="custom-model" className="text-zinc-200">
+                Custom Model
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="custom-model"
+                  placeholder="e.g. openai/gpt-4o-mini"
+                  value={customModelValue}
+                  onChange={(e) => handleCustomModelChange(e.target.value)}
+                  className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500"
+                />
+                <Switch
+                  checked={useCustomModel}
+                  onCheckedChange={(checked) => {
+                    setUseCustomModel(checked)
+                    if (checked && customModelValue.trim()) {
+                      setSettings({ ...settings, selectedModel: customModelValue.trim() })
+                    } else {
+                      setSettings({ ...settings, selectedModel: PRESET_MODELS[0].id })
+                    }
+                  }}
+                  className="data-[state=checked]:bg-zinc-300"
+                />
+              </div>
+              <p className="text-xs text-zinc-500">
+                Type any model ID. Toggle switch to use custom model instead of presets.
+              </p>
+            </div>
+
+            {settings.selectedModel && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 rounded-lg border border-zinc-800">
+                <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
+                <span className="text-xs text-zinc-400">Active model:</span>
+                <code className="text-xs text-zinc-200 font-mono">{settings.selectedModel}</code>
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="api" className="mt-4 space-y-6">
+          {/* API tab */}
+          <TabsContent value="api" className="mt-4 space-y-5">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="use-custom-api" className="text-zinc-100">
+                <Label htmlFor="use-custom-api" className="text-zinc-200">
                   Use Custom API
                 </Label>
                 <p className="text-xs text-zinc-500">
@@ -133,12 +221,12 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
                 onCheckedChange={(checked) =>
                   setSettings({ ...settings, useCustomApi: checked })
                 }
-                className="data-[state=checked]:bg-zinc-100"
+                className="data-[state=checked]:bg-zinc-300"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api-endpoint" className="text-zinc-100">
+              <Label htmlFor="api-endpoint" className="text-zinc-200">
                 API Endpoint URL
               </Label>
               <Input
@@ -149,15 +237,15 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
                   setSettings({ ...settings, customApiEndpoint: e.target.value })
                 }
                 disabled={!settings.useCustomApi}
-                className="bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50"
+                className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50 focus:border-zinc-500"
               />
               <p className="text-xs text-zinc-500">
-                OpenAI-compatible endpoint (e.g., /v1/chat/completions)
+                OpenAI-compatible endpoint (e.g. /v1/chat/completions)
               </p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="api-key" className="text-zinc-100">
+              <Label htmlFor="api-key" className="text-zinc-200">
                 API Key (Optional)
               </Label>
               <Input
@@ -169,7 +257,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
                   setSettings({ ...settings, customApiKey: e.target.value })
                 }
                 disabled={!settings.useCustomApi}
-                className="bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50"
+                className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50 focus:border-zinc-500"
               />
             </div>
 
@@ -178,7 +266,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
                 variant="outline"
                 onClick={handleTestConnection}
                 disabled={!settings.useCustomApi || testStatus === "testing"}
-                className="bg-zinc-900 border-zinc-700 text-zinc-100 hover:bg-zinc-800 disabled:opacity-50"
+                className="bg-zinc-900 border-zinc-700 text-zinc-100 hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-50"
               >
                 {testStatus === "testing" && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -212,7 +300,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
           </Button>
           <Button
             onClick={handleSave}
-            className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+            className="bg-white text-zinc-950 hover:bg-zinc-200"
           >
             Save Changes
           </Button>

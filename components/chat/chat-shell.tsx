@@ -34,7 +34,7 @@ export function ChatShell() {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel>("google/gemini-2.0-flash-001")
   const [isLoaded, setIsLoaded] = useState(false)
-  
+
   // New state for features
   const [currentConversationId, setCurrentConversationIdState] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -43,6 +43,7 @@ export function ChatShell() {
     customApiEndpoint: "",
     customApiKey: "",
     useCustomApi: false,
+    selectedModel: "google/gemini-2.0-flash-001",
   })
 
   // Load messages and settings on mount
@@ -54,7 +55,11 @@ export function ChatShell() {
       }
       
       // Load settings
-      setAppSettings(getSettings())
+      const loadedSettings = getSettings()
+      setAppSettings(loadedSettings)
+      if (loadedSettings.selectedModel) {
+        setSelectedModel(loadedSettings.selectedModel as AIModel)
+      }
       
       // Load current conversation
       const currentId = getCurrentConversationId()
@@ -115,7 +120,10 @@ export function ChatShell() {
 
   const handleSettingsChange = useCallback((settings: AppSettings) => {
     setAppSettings(settings)
-  }, [])
+    if (settings.selectedModel && settings.selectedModel !== selectedModel) {
+      setSelectedModel(settings.selectedModel as AIModel)
+    }
+  }, [selectedModel])
 
   // Send a message to the AI
   const sendMessage = useCallback(
