@@ -17,6 +17,7 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
   const [copied, setCopied] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop")
+  const [isUnlocked, setIsUnlocked] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const codeHash = (s: string) => {
