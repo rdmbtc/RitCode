@@ -53,12 +53,9 @@ function buildModel(modelId: string): LanguageModel {
     const baseURL = process.env[`${provider.toUpperCase()}_BASE_URL`]
     console.log(`[chat] Using ${provider} provider, key=${key ? 'set' : 'unset'}, baseURL=${baseURL || 'default'}`)
     if (!key) throw new Error(`${provider.toUpperCase()}_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.`)
-    const openai = createOpenAI({
-      apiKey: key,
-      ...(baseURL ? { baseURL } : {}),
-      compatibility: 'strict', // force /v1/chat/completions instead of /responses
-    })
-    return openai(name)
+    const openai = createOpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}) })
+    // SDK v3 routes unknown model IDs to responses() API — force chat() for /v1/chat/completions
+    return openai.chat(name as any)
   }
 
   // Fallback: OpenAI SDK
