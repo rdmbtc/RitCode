@@ -213,10 +213,11 @@ export function MarkdownRenderer({ content, className, isStreaming = false }: Ma
   }
 
   const renderCodeBlock = (part: string, partIndex: number) => {
-    const codeContent = part.slice(3, -3)
-    const firstNewline = codeContent.indexOf("\n")
-    const language = firstNewline > 0 ? codeContent.slice(0, firstNewline).trim() : ""
-    const code = firstNewline > 0 ? codeContent.slice(firstNewline + 1) : codeContent
+    const codeContent = part.slice(3, -3).trim()
+    // Extract language: "html\n..." or "html..." (no newline)
+    const langMatch = codeContent.match(/^([a-zA-Z0-9_+-]+)(\s+|\n|)(.*)/s)
+    const language = langMatch ? langMatch[1].toLowerCase() : ""
+    const code = langMatch ? langMatch[3] : codeContent
 
     // Use CodeBlockWithPreview for HTML-like content
     return <CodeBlockWithPreview key={partIndex} code={code} language={language} />
