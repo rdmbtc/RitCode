@@ -17,9 +17,10 @@ import Image from "next/image"
 import { AnimatedOrb } from "./animated-orb"
 import { AudioWaveform } from "./audio-waveform"
 
-export type AIModel = "google/gemini-2.0-flash-001" | "openai/gpt-4o" | "anthropic/claude-sonnet-4"
+export type AIModel = "google/gemini-2.0-flash-001" | "openai/gpt-4o" | "anthropic/claude-sonnet-4" | string
 
 export const AI_MODELS: { id: AIModel; name: string; icon: string }[] = [
+  { id: "anthropic/minimax-m2.5-free", name: "MiniMax", icon: "/images/claude.svg" },
   { id: "google/gemini-2.0-flash-001", name: "Gemini", icon: "/images/google.webp" },
   { id: "openai/gpt-4o", name: "GPT-4o", icon: "/images/gpt.png" },
   { id: "anthropic/claude-sonnet-4", name: "Claude", icon: "/images/claude.svg" },
@@ -200,7 +201,8 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
     setUploadedImage(null)
   }, [])
 
-  const currentModel = AI_MODELS.find((m) => m.id === selectedModel) || AI_MODELS[0]
+  const currentModel = AI_MODELS.find((m) => m.id === selectedModel)
+  const modelDisplayName = currentModel?.name || selectedModel.split("/").pop() || selectedModel
 
   return (
     <div className={cn("fixed bottom-2 sm:bottom-4 left-0 right-0 px-2 sm:px-4 pointer-events-none z-10", hasAnimated && "composer-intro")}>
@@ -381,7 +383,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, selectedModel,
               </DropdownMenuPortal>
             </DropdownMenu>
 
-            <span className="text-xs text-zinc-500 hidden sm:inline">{currentModel.name}</span>
+            <span className="text-xs text-zinc-500 hidden sm:inline">{modelDisplayName}</span>
           </div>
         </div>
       </div>

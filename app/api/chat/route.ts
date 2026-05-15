@@ -27,11 +27,13 @@ function parseModelId(modelId: string): { provider: string; name: string } {
 
 function buildModel(modelId: string): LanguageModel {
   const { provider, name } = parseModelId(modelId)
+  console.log(`[chat] Building model: provider=${provider}, name=${name}`)
 
   // Google / Gemini
   if (provider === "google" || provider === "gemini") {
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
     if (!apiKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+    console.log(`[chat] Using Google provider, key length=${apiKey.length}`)
     const google = createGoogleGenerativeAI({ apiKey })
     return google(name)
   }
@@ -40,6 +42,7 @@ function buildModel(modelId: string): LanguageModel {
   if (provider === "openai") {
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+    console.log(`[chat] Using OpenAI provider, key length=${apiKey.length}`)
     const openai = createOpenAI({ apiKey })
     return openai(name)
   }
@@ -47,8 +50,9 @@ function buildModel(modelId: string): LanguageModel {
   // Anthropic, Groq, xAI — try their own key first, fall back to OpenAI key
   if (provider === "anthropic" || provider === "groq" || provider === "xai") {
     const key = process.env[`${provider.toUpperCase()}_API_KEY`] || process.env.OPENAI_API_KEY
-    if (!key) throw new Error(`${provider.toUpperCase()}_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.`)
     const baseURL = process.env[`${provider.toUpperCase()}_BASE_URL`]
+    console.log(`[chat] Using ${provider} provider, key=${key ? 'set' : 'unset'}, baseURL=${baseURL || 'default'}`)
+    if (!key) throw new Error(`${provider.toUpperCase()}_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.`)
     const openai = createOpenAI({ apiKey: key, ...(baseURL ? { baseURL } : {}) })
     return openai(name)
   }
@@ -56,6 +60,7 @@ function buildModel(modelId: string): LanguageModel {
   // Fallback: OpenAI SDK
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set. Configure a custom API endpoint in Settings or set the env var.")
+  console.log(`[chat] Using OpenAI fallback, key length=${apiKey.length}`)
   const openai = createOpenAI({ apiKey })
   return openai(name)
 }
