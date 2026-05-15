@@ -23,7 +23,10 @@ interface SettingsDialogProps {
   onSettingsChange?: (settings: AppSettings) => void
 }
 
-const PRESET_MODELS = AI_MODELS.map((m) => ({ id: m.id, name: m.name }))
+const PRESET_MODELS = [
+  { id: "anthropic/minimax-m2.5-free", name: "MiniMax M2.5" },
+  ...AI_MODELS.map((m) => ({ id: m.id, name: m.name })),
+]
 
 export function SettingsDialog({ open, onOpenChange, onSettingsChange }: SettingsDialogProps) {
   const [settings, setSettings] = useState<AppSettings>({
