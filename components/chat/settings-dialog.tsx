@@ -304,7 +304,7 @@ export function SettingsDialog({ open, onOpenChange, onSettingsChange }: Setting
               <p className="text-sm text-zinc-400 mb-4">
                 Save code to Ritual blockchain via MetaMask. Code stored as transaction data with mint call.
               </p>
-              <CodeMint contractAddress="0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948" />
+              <CodeMint />
             </div>
           </TabsContent>
         </Tabs>
