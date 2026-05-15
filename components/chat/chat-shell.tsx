@@ -184,6 +184,8 @@ export function ChatShell() {
 
         let accumulatedContent = ""
         let buffer = ""
+        let isSSE = false
+        let hasCheckedFormat = false
 
         while (true) {
           const { done, value } = await reader.read()
@@ -192,46 +194,75 @@ export function ChatShell() {
 
           buffer += decoder.decode(value, { stream: true })
 
-          // Process complete SSE events (separated by \n\n)
-          const parts = buffer.split("\n\n")
-          // Keep the last part in buffer (might be incomplete)
-          buffer = parts.pop() || ""
+          if (!hasCheckedFormat) {
+            // Detect format: SSE (data:) or AI SDK text stream (raw JSON)
+            isSSE = buffer.includes("data: ")
+            hasCheckedFormat = true
+          }
 
-          for (const part of parts) {
-            const lines = part.split("\n")
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const jsonStr = line.slice(6).trim()
-                if (!jsonStr || jsonStr === "[DONE]") continue
+          if (isSSE) {
+            // Process complete SSE events (separated by \n\n)
+            const parts = buffer.split("\n\n")
+            buffer = parts.pop() || ""
 
-                try {
-                  const data = JSON.parse(jsonStr)
-                  let text = ""
+            for (const part of parts) {
+              const lines = part.split("\n")
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  const jsonStr = line.slice(6).trim()
+                  if (!jsonStr || jsonStr === "[DONE]") continue
 
-                  // AI SDK format: { type: "text", text: "..." }
-                  if (data.type === "text" && typeof data.text === "string") {
-                    text = data.text
-                  }
-                  // OpenAI-compatible format: { choices: [{ delta: { content: "..." } }] }
-                  else if (data.choices?.[0]?.delta?.content) {
-                    text = data.choices[0].delta.content
-                  }
-                  // Fallback: if the whole thing is a text string
-                  else if (typeof data === "string") {
-                    text = data
-                  }
+                  try {
+                    const data = JSON.parse(jsonStr)
+                    let text = ""
 
-                  if (text) {
-                    accumulatedContent += text
-                    setMessages((prev) =>
-                      prev.map((msg) =>
-                        msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
-                      ),
-                    )
+                    if (data.choices?.[0]?.delta?.content) {
+                      text = data.choices[0].delta.content
+                    } else if (typeof data === "string") {
+                      text = data
+                    }
+
+                    if (text) {
+                      accumulatedContent += text
+                      setMessages((prev) =>
+                        prev.map((msg) =>
+                          msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                        ),
+                      )
+                    }
+                  } catch {
+                    // Not valid JSON yet
                   }
-                } catch {
-                  // Not valid JSON yet — could be partial, skip for now
                 }
+              }
+            }
+          } else {
+            // AI SDK text stream: raw JSON lines
+            const lines = buffer.split("\n")
+            buffer = lines.pop() || ""
+
+            for (const line of lines) {
+              if (!line.trim()) continue
+              try {
+                const data = JSON.parse(line)
+
+                if (data.type === "text-delta" && typeof data.textDelta === "string") {
+                  accumulatedContent += data.textDelta
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                    ),
+                  )
+                } else if (data.type === "text" && typeof data.text === "string") {
+                  accumulatedContent = data.text
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessage.id ? { ...msg, content: accumulatedContent } : msg,
+                    ),
+                  )
+                }
+              } catch {
+                // Not valid JSON
               }
             }
           }
