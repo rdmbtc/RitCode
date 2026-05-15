@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useAccount } from "wagmi"
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
 import { X, Code, Eye, Copy, Check, Maximize2, Minimize2, RefreshCw, Monitor, Tablet, Smartphone, Lock, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -19,15 +19,26 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
   const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  // Lock state
-  const { address, isConnected } = useAccount()
-  const [isUnlocked, setIsUnlocked] = useState(false)
+  const codeHash = (s: string) => {
+    let h = 0
+    for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0 }
+    return h.toString(36)
+  }
 
+  // Check unlock on mount / code change
   useEffect(() => {
-    if (!address) return
-    const key = `unlocked-html-${address}`
+    const key = `unlocked-html-${codeHash(code)}`
     if (localStorage.getItem(key)) setIsUnlocked(true)
-  }, [address])
+  }, [code])
+
+  // Listen for unlock event from MintButton
+  useEffect(() => {
+    const handler = () => setIsUnlocked(true)
+    window.addEventListener("code-unlocked", handler)
+    return () => window.removeEventListener("code-unlocked", handler)
+  }, [])
+
+  const { address, isConnected } = useAccount()
 
   const generateHtml = useCallback((sourceCode: string, lang?: string) => {
     if (lang === "html" || sourceCode.trim().startsWith("<!DOCTYPE") || sourceCode.trim().startsWith("<html")) {
@@ -200,10 +211,8 @@ export function HtmlPreview({ code, language, onClose }: HtmlPreviewProps) {
 }
 
 function MintButton({ code }: { code: string }) {
-  const { useWriteContract, useWaitForTransactionReceipt, useAccount } = require("wagmi")
   const { writeContract, data: hash, error: writeError, isPending: writing } = useWriteContract()
   const { isLoading: confirming, isSuccess: confirmed } = useWaitForTransactionReceipt({ hash })
-  const { address } = useAccount()
 
   const CODE_MINT_ADDRESS = "0x5b69332815068e23433d1d2daa80cdd24e5a0d7f"
   const MINT_PRICE_WEI = 1000000000000000n
@@ -218,12 +227,18 @@ function MintButton({ code }: { code: string }) {
     },
   ] as const
 
+  const codeHash = (s: string) => {
+    let h = 0
+    for (let i = 0; i < s.length; i++) { h = ((h << 5) - h) + s.charCodeAt(i); h |= 0 }
+    return h.toString(36)
+  }
+
   useEffect(() => {
-    if (confirmed && address) {
-      localStorage.setItem(`unlocked-html-${address}`, hash || "")
+    if (confirmed) {
+      localStorage.setItem(`unlocked-html-${codeHash(code)}`, hash || "")
       window.dispatchEvent(new CustomEvent("code-unlocked"))
     }
-  }, [confirmed, hash, address])
+  }, [confirmed, hash, code])
 
   const handleMint = async () => {
     try {
