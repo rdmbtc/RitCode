@@ -23,7 +23,62 @@ When generating HTML/CSS:
 
 When explaining code or technical concepts, use markdown formatting with code blocks where appropriate.
 Be conversational but professional. If you're unsure about something, say so honestly.
-When analyzing images, describe them in detail and answer any questions about them.`
+When analyzing images, describe them in detail and answer any questions about them.
+
+## Ritual dApp Frontend Reference
+
+When generating frontend code for Ritual, use wagmi v2 + viem v2. Follow these patterns:
+
+### Chain Configuration
+\`\`\`typescript
+import { defineChain } from "viem"
+export const ritualChain = defineChain({
+  id: 1979, name: "Ritual", nativeCurrency: { name: "RITUAL", symbol: "RITUAL", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.ritualfoundation.org"] } },
+  blockExplorers: { default: { name: "Ritual Explorer", url: "https://explorer.ritualfoundation.org" } },
+})
+\`\`\`
+
+### Critical: writeContractAsync Breaks on Async Precompiles
+Async precompiles (HTTP 0x0801, LLM 0x0802, etc.) are NOT deployed contracts — they are handled at the EVM level. wagmi's writeContractAsync runs simulateContract (eth_call) before sending, which returns "call to non-contract address" for precompiles.
+
+Use useSendTransaction with encodeFunctionData instead:
+\`\`\`typescript
+import { encodeFunctionData } from "viem"
+import { useSendTransaction } from "wagmi"
+const { sendTransactionAsync } = useSendTransaction()
+const data = encodeFunctionData({ abi, functionName: "yourFunction", args })
+const hash = await sendTransactionAsync({ to: contractAddress, data, gas: 2_000_000n })
+\`\`\`
+
+### Core System Contract Addresses
+- RitualWallet (deposit/withdraw): 0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948
+- AsyncJobTracker (job lifecycle): 0xC069FFCa0389f44eCA2C626e55491b0ab045AEF5
+- ModelPricingRegistry (LLM pricing): 0x7A85F48b971ceBb75491b61abe279728F4c4384f
+- TEE Service Registry: 0x9644e8562cE0Fe12b4deeC4163c064A8862Bf47F
+
+### Precompile Addresses
+- HTTP Call: 0x0000000000000000000000000000000000000801
+- LLM: 0x0000000000000000000000000000000000000802
+- Long HTTP: 0x0000000000000000000000000000000000000805
+- Sovereign Agent: 0x000000000000000000000000000000000000080C
+- Image Gen: 0x0000000000000000000000000000000000000818
+
+### Async Transaction States
+Async precompile calls go through 9 states: SUBMITTING → PENDING_COMMITMENT → COMMITTED → EXECUTOR_PROCESSING → RESULT_READY → PENDING_SETTLEMENT → SETTLED | FAILED | EXPIRED
+
+Track with Zustand persist store for localStorage survival across refreshes.
+
+### Fee Estimation
+HTTP fees: BASE_FEE_WEI (2.5T) + PER_INPUT_BYTE_WEI (350M) + PER_OUTPUT_BYTE_WEI (350M).
+LLM fees: total_gas × 1gwei (model-dependent via ModelPricingRegistry).
+
+### Common Errors
+- "sender locked" / "pending job" — user has pending async tx, wait for settlement
+- "insufficient deposit" — need to fund RitualWallet before submitting
+- "no executor" — no executor available, retry shortly
+- "job expired" — TTL exceeded, increase TTL or retry
+`
 
 function parseModelId(modelId: string): { provider: string; name: string } {
   const slashIndex = modelId.indexOf("/")
