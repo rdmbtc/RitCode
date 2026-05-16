@@ -235,9 +235,10 @@ function MintButton({ code }: { code: string }) {
   }
 
   useEffect(() => {
-    if (confirmed) {
+    if (confirmed && hash) {
       localStorage.setItem(`unlocked-html-${codeHash(code)}`, hash || "")
       window.dispatchEvent(new CustomEvent("code-unlocked"))
+      window.dispatchEvent(new CustomEvent("code-minted", { detail: { hash, code: code.substring(0, 40) } }))
     }
   }, [confirmed, hash, code])
 
@@ -255,11 +256,23 @@ function MintButton({ code }: { code: string }) {
     }
   }
 
-  if (confirmed) {
+  if (confirmed && hash) {
+    const explorerUrl = `https://explorer.ritualfoundation.org/tx/${hash}`
     return (
-      <div className="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 flex items-center gap-2">
-        <Check className="w-4 h-4 text-green-400" />
-        <span className="text-sm text-green-300">Code unlocked!</span>
+      <div className="bg-green-900/20 border border-green-800/50 rounded-lg px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Check className="w-4 h-4 text-green-400 shrink-0" />
+          <span className="text-sm text-green-300">Code unlocked!</span>
+        </div>
+        <a
+          href={explorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs text-green-400/80 hover:text-green-300 transition-colors"
+        >
+          View on Ritual Explorer →
+        </a>
+        <div className="font-mono text-[10px] text-zinc-500 truncate">{hash}</div>
       </div>
     )
   }

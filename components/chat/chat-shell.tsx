@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { MessageSquareDashed, History, Settings } from "lucide-react"
+import { MessageSquareDashed, History, Settings, ExternalLink } from "lucide-react"
 import { MessageList } from "./message-list"
 import { Composer, type AIModel } from "./composer"
 import { ChatHistory } from "./chat-history"
@@ -35,6 +35,7 @@ export function ChatShell() {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [selectedModel, setSelectedModel] = useState<AIModel>("anthropic/minimax-m2.5-free")
   const [isLoaded, setIsLoaded] = useState(false)
+  const [mintNotification, setMintNotification] = useState<{ hash: string; code: string } | null>(null)
 
   // New state for features
   const [currentConversationId, setCurrentConversationIdState] = useState<string | null>(null)
@@ -77,6 +78,17 @@ export function ChatShell() {
     } finally {
       setIsLoaded(true)
     }
+  }, [])
+
+  // Listen for code mint notifications
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { hash: string; code: string }
+      setMintNotification(detail)
+      setTimeout(() => setMintNotification(null), 8000)
+    }
+    window.addEventListener("code-minted", handler)
+    return () => window.removeEventListener("code-minted", handler)
   }, [])
 
   // Save conversation whenever messages change
@@ -421,6 +433,36 @@ export function ChatShell() {
       </Button>
 
       <MessageList messages={messages} isStreaming={isStreaming} error={error} onRetry={retry} isLoaded={isLoaded} />
+
+      {/* Mint notification toast */}
+      {mintNotification && (
+        <div className="absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className="bg-green-900/30 border border-green-700/50 rounded-xl px-4 py-3 backdrop-blur-sm shadow-lg">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <span className="text-sm text-green-300 font-medium">Code minted on Ritual!</span>
+                <a
+                  href={`https://explorer.ritualfoundation.org/tx/${mintNotification.hash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-xs text-green-400/70 hover:text-green-300 transition-colors"
+                >
+                  View transaction →
+                </a>
+              </div>
+              <button
+                onClick={() => setMintNotification(null)}
+                className="ml-2 text-zinc-500 hover:text-zinc-300 text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Composer
         onSend={sendMessage}
