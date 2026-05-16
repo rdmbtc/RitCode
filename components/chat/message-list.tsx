@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { MessageBubble } from "./message-bubble"
 import type { Message } from "./chat-shell"
 import { TypingIndicator } from "./typing-indicator"
-import { AlertCircle, RefreshCw } from "lucide-react"
+import { AlertCircle, RefreshCw, Code2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AnimatedOrb } from "./animated-orb"
 
@@ -119,6 +119,20 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
       lastMessage?.role === "user" ||
       (lastMessage?.role === "assistant" && lastMessage?.content === ""))
 
+  // Track streaming content to show "Thinking" / "Coding" status
+  const [streamingStatus, setStreamingStatus] = useState<"thinking" | "coding">("thinking")
+  const prevContentRef = useRef("")
+  useEffect(() => {
+    if (!isStreaming || !lastMessage || lastMessage.role !== "assistant") return
+    const content = lastMessage.content || ""
+    if (content.length < 5) {
+      setStreamingStatus("thinking")
+    } else if (content.includes("```") || content.includes("<!") || content.includes("<html") || content.includes("<div")) {
+      setStreamingStatus("coding")
+    }
+    prevContentRef.current = content
+  }, [isStreaming, lastMessage])
+
   if (!isLoaded) {
     return (
       <div className="absolute inset-0 flex items-center justify-center">
@@ -158,6 +172,10 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
           if (isStreaming && message.role === "assistant" && message === lastMessage && message.content === "") {
             return false
           }
+          // Hide assistant message content during streaming — show status indicator instead
+          if (isStreaming && message.role === "assistant" && message === lastMessage) {
+            return false
+          }
           return true
         })
         .map((message) => (
@@ -169,6 +187,47 @@ export function MessageList({ messages, isStreaming, error, onRetry, isLoaded }:
         ))}
 
       {showTypingIndicator && <TypingIndicator />}
+
+      {/* Streaming status - Thinking / Coding */}
+      {isStreaming && lastMessage?.role === "assistant" && (
+        <div className="flex gap-3 max-w-[90%] md:max-w-[80%] mr-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="shrink-0">
+            <AnimatedOrb size={32} />
+          </div>
+          <div
+            className="px-4 py-2.5 rounded-2xl rounded-bl-md bg-zinc-900 border border-zinc-800"
+            style={{ boxShadow: "rgba(255, 255, 255, 0.04) 0px 0px 0px 1px" }}
+          >
+            <div className="flex items-center gap-2">
+              {streamingStatus === "thinking" ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-zinc-500 animate-spin" />
+                  <span className="text-xs text-zinc-500">
+                    Thinking
+                    <span className="inline-flex">
+                      <span className="animate-[pulse_1.5s_ease-in-out_infinite]">.</span>
+                      <span className="animate-[pulse_1.5s_ease-in-out_infinite_0.3s]">.</span>
+                      <span className="animate-[pulse_1.5s_ease-in-out_infinite_0.6s]">.</span>
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Code2 className="w-4 h-4 text-emerald-500 animate-pulse" />
+                  <span className="text-xs text-zinc-500">
+                    Coding
+                    <span className="inline-flex">
+                      <span className="animate-[pulse_1s_ease-in-out_infinite]">.</span>
+                      <span className="animate-[pulse_1s_ease-in-out_infinite_0.25s]">.</span>
+                      <span className="animate-[pulse_1s_ease-in-out_infinite_0.5s]">.</span>
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error state */}
       {error && (
