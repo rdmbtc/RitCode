@@ -53,7 +53,7 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
         {/* Bubble */}
         <div
           className={cn(
-            "rounded-2xl border-none overflow-hidden",
+            "rounded-2xl border-none overflow-hidden overflow-x-auto max-w-full",
             isUser
               ? "bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-br-md"
               : "bg-transparent text-zinc-100 rounded-bl-md",
